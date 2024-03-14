@@ -13,7 +13,7 @@ from torch.utils import _pytree
 
 
 """
-This is the function that runs shape inference will modify the input graph module so that shapes are annotated.
+This is the function that runs shape inference. It will modify the input graph module so that shapes are annotated.
 """
 
 
