@@ -2,7 +2,6 @@
 
 import sys
 import unittest
-from typing import Dict, Sequence
 
 import torch
 import torch.xpu._gpu_trace as gpu_trace
@@ -231,9 +230,6 @@ if __name__ == "__main__":
 
 
 instantiate_device_type_tests(TestXpu, globals(), only_for="xpu")
-
-
-instantiate_device_type_tests(TestXpu, globals())
 
 
 class TestXpuTrace(TestCase):
