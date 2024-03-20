@@ -45,4 +45,3 @@
 #if defined(COMPILER_HAS_ARM_SVE)
 #include <arm_sve.h>
 #endif
-

@@ -79,4 +79,3 @@ if(NOT CORTEXA9_FOUND)
       MESSAGE(STATUS "No OMAP4 processor on this machine.")
 endif(NOT CORTEXA9_FOUND)
 mark_as_advanced(NEON_FOUND)
-
