@@ -609,6 +609,16 @@ class TestInductorDynamic(TestCase):
         output = cfunc(x, op, a)
         self.assertEqual(output, expected)
 
+    @torch._dynamo.config.patch(capture_scalar_outputs=True)
+    def test_item_unbacked_stride_nobreak(self, device):
+        @torch.compile(fullgraph=True, dynamic=True)
+        def f(x):
+            a = x.item()
+            torch._constrain_as_size(a, min=1, max=10)
+            return torch.ones(a, a)
+
+        f(torch.tensor([5], device=device))
+
 
 instantiate_device_type_tests(TestInductorDynamic, globals())
 
