@@ -42,7 +42,7 @@
 #include <spe.h>
 #endif
 /* CLANG and GCC-compatible compilers, targeting ARM with SVE */
-#if defined(__ARM_FEATURE_SVE)
+#if defined(COMPILER_HAS_ARM_SVE)
 #include <arm_sve.h>
 #endif
 
