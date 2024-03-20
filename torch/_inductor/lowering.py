@@ -54,6 +54,7 @@ from .ir import (
 from .utils import (
     ceildiv,
     decode_device,
+    get_dtype_size,
     is_dynamic,
     is_pointwise_use,
     pad_listlike,
@@ -2275,9 +2276,7 @@ make_fallback(aten.searchsorted)  # bucketized is implemented (see eager impl)
 # 1.5) Easy or Impossible
 make_fallback(aten._cdist_forward)  # p=2 should be feasible
 make_fallback(aten._cdist_backward)
-# Looking like impossible, see: https://github.com/pytorch/pytorch/pull/121354
-make_fallback(aten.resize_)
-make_fallback(aten.resize_as_)
+
 
 # 2) Medium
 make_fallback(aten.max_unpool2d)
@@ -5995,6 +5994,21 @@ def resize(x, size, *, memory_format=None):
     return ir.ExternKernel.require_stride_order(
         pointwise, ir.get_stride_order(new_stride)
     )
+
+
+@register_lowering(aten.resize_, type_promotion_kind=None)
+def resize_(x, size, *, memory_format=None):
+    val = resize(x, size, memory_format=memory_format)
+    if isinstance(x, TensorBox):
+        x_data = x.data  # type: ignore[attr-defined]
+    else:
+        x_data = x
+    assert isinstance(val, ir.StorageBox)
+    if x_data.is_input_buffer() or isinstance(x_data.data, ir.NopKernel):
+        ir.ResizeStorageBytes(x, val.get_numel() * get_dtype_size(x.get_dtype()))
+    val.realize()
+    x_data.data = val.data
+    return x
 
 
 from torch._higher_order_ops.auto_functionalize import auto_functionalized
