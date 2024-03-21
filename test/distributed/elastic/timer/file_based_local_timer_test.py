@@ -120,6 +120,44 @@ if not (IS_WINDOWS or IS_MACOS):
             self.server.run_once()  # Allows the server to process all requests
             self.assertEqual(2 * num_clients * num_requests_per_client, self.server._request_count)
 
+        @mock.patch("torch.distributed.elastic.timer.FileTimerServer._reap_worker")
+        def test_exit_before_release(self, mock_reap):
+            def func1(file_path):
+                client = timer.FileTimerClient(file_path)
+                timer.configure(client)
+                expire = time.time() + 5
+                client.acquire("test_scope", expire)
+                time.sleep(1)
+
+            p = mp.Process(target=func1, args=(self.file_path,))
+            p.start()
+            p.join()
+
+            time.sleep(6)
+            self.server.run_once()  # Allows the server to process all requests
+            mock_reap.assert_not_called()
+            self.assertEqual(0, len(self.server._timers))
+
+        @mock.patch("torch.distributed.elastic.timer.FileTimerServer._reap_worker")
+        @mock.patch("psutil.pid_exists")
+        def test_exit_before_release_reap(self, mock_pid_exists, mock_reap):
+            def func1(file_path):
+                client = timer.FileTimerClient(file_path)
+                timer.configure(client)
+                expire = time.time() + 5
+                client.acquire("test_scope", expire)
+                time.sleep(1)
+
+            mock_pid_exists.return_value = True
+            p = mp.Process(target=func1, args=(self.file_path,))
+            p.start()
+            p.join()
+
+            time.sleep(6)
+            self.server.run_once()  # Allows the server to process all requests
+            mock_reap.assert_called()
+            self.assertEqual(0, len(self.server._timers))
+
         @staticmethod
         def _run(file_path, timeout, duration):
             client = timer.FileTimerClient(file_path)

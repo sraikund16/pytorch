@@ -6,8 +6,8 @@
 
 import io
 import json
-import logging
 import os
+import psutil
 import select
 import signal
 import sys
@@ -16,10 +16,11 @@ import time
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from torch.distributed.elastic.timer.api import TimerClient, TimerRequest
+from torch.distributed.elastic.utils.logging import get_logger
 
 __all__ = ["FileTimerClient", "FileTimerRequest", "FileTimerServer"]
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 class FileTimerRequest(TimerRequest):
     """
@@ -309,7 +310,7 @@ class FileTimerServer:
 
     def clear_timers(self, worker_pids: Set[int]) -> None:
         for (pid, scope_id) in list(self._timers.keys()):
-            if pid in worker_pids:
+            if pid in worker_pids or not psutil.pid_exists(pid):
                 del self._timers[(pid, scope_id)]
 
     def get_expired_timers(self, deadline: float) -> Dict[int, List[FileTimerRequest]]:
