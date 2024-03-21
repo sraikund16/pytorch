@@ -186,11 +186,16 @@ def unimplemented_with_warning(e: Exception, code, msg: str) -> NoReturn:
     graph_break_msg = format_error_msg_verbose(e, code)
     graph_breaks_log.debug("%s", graph_break_msg)
     log.warning(msg)
-    raise unimplemented(msg) from e
+    unimplemented(msg, from_exc=e)
 
 
-def unimplemented(msg: str) -> NoReturn:
+_NOTHING = object()
+
+
+def unimplemented(msg: str, *, from_exc: Any = _NOTHING) -> NoReturn:
     assert msg != os.environ.get("BREAK", False)
+    if from_exc is not _NOTHING:
+        raise Unsupported(msg) from from_exc
     raise Unsupported(msg)
 
 
