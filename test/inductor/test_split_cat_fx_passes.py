@@ -72,17 +72,17 @@ class TestSplitCatFxPasses(TestCase):
         ]
         for fn, expected_split_norm_count in [
             (arg_only, 1),
-            (arg_only_dim0, 0),
+            (arg_only_dim0, 1),
             (kwarg1, 1),
             (kwarg2, 1),
             (kwarg3, 1),
             (list_replace, 1),
-            (multi_split, 1),
+            (multi_split, 17),
             (unequal_split, 1),
             (arg_only_cm, 1),
             (kwarg1_cm, 1),
             (kwarg2_cm, 1),
-            (multi_split_cm, 1),
+            (multi_split_cm, 17),
             (unequal_split_cm, 1),
             (cm_with_list, 1),
         ]:
@@ -91,12 +91,12 @@ class TestSplitCatFxPasses(TestCase):
 
             torch.testing.assert_close(actual, expected)
             self.assertEqual(
-                counters["inductor"]["split_cat_norm"],
+                counters["inductor"]["normalization_pass"],
                 expected_split_norm_count,
             )
             if expected_split_norm_count > 0:
                 self.assertIn(
-                    "split_cat_pattern_normalization_pass_pre_grad", optimus_scuba_log
+                    "normalization_pass_pre_grad", optimus_scuba_log
                 )
             counters.clear()
 
@@ -269,12 +269,12 @@ class TestSplitCatFxPasses(TestCase):
 
             torch.testing.assert_close(actual, expected)
             self.assertEqual(
-                counters["inductor"]["consecutive_split_merged"],
+                counters["inductor"]["merge_splits_pass"],
                 expected_split_merged,
             )
             if expected_split_merged > 0:
                 self.assertIn(
-                    "split_cat_pattern_merge_splits_pass_pre_grad", optimus_scuba_log
+                    "merge_splits_pass_pre_grad", optimus_scuba_log
                 )
             counters.clear()
 
@@ -634,7 +634,7 @@ class TestSplitCatFxPasses(TestCase):
             0,
         )
         self.assertEqual(
-            counters["inductor"]["split_cat_norm"],
+            counters["inductor"]["normalization_pass"],
             0,
         )
 
@@ -900,7 +900,7 @@ class TestSplitCatFxPasses(TestCase):
                 expected_sections_removed,
             )
             self.assertEqual(
-                counters["inductor"]["split_cat_norm"],
+                counters["inductor"]["normalization_pass"],
                 expected_unbind_normalized,
             )
             counters.clear()
@@ -1127,11 +1127,11 @@ class TestSplitCatFxPasses(TestCase):
 
             torch.testing.assert_close(actual, expected)
             self.assertEqual(
-                counters["inductor"]["getitem_cat_merged"],
+                counters["inductor"]["merge_getitem_cat_pass"],
                 expected_getitem_cat_merged,
             )
             self.assertEqual(
-                counters["inductor"]["cat_mutated"],
+                counters["inductor"]["mutate_cat_pass"],
                 expected_cat_removed,
             )
             counters.clear()
@@ -1165,11 +1165,11 @@ class TestSplitCatFxPasses(TestCase):
 
             torch.testing.assert_close(actual, expected)
             self.assertEqual(
-                counters["inductor"]["stack_tahn_unbind_merged"],
+                counters["inductor"]["merge_stack_tahn_unbind_pass"],
                 expected_stack_tahn_unbind_merged,
             )
             self.assertIn(
-                "split_cat_pattern_merge_getitem_cat_pass_pre_grad", optimus_scuba_log
+                "merge_getitem_cat_pass_pre_grad", optimus_scuba_log
             )
             counters.clear()
 
