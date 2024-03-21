@@ -19,9 +19,11 @@ from functorch import make_fx
 from torch import Tensor
 from torch._custom_op.impl import custom_op, CustomOp, infer_schema
 from torch._utils_internal import get_file_path_2
+from torch.library import def_blackbox
 from torch.testing._internal.common_cuda import TEST_CUDA
 from torch.testing._internal.custom_op_db import custom_op_db
 from typing import *  # noqa: F403
+import numpy as np
 
 
 class CustomOpTestCaseBase(TestCase):
@@ -677,6 +679,136 @@ class TestCustomOp(CustomOpTestCaseBase):
                 raise NotImplementedError()
 
             infer_schema(foo, mutated_args={"y"})
+
+    def test_blackbox_basic(self):
+        @def_blackbox(mutated_args=())
+        def f(x: Tensor, y: float) -> Tensor:
+            return x + y
+
+        x = torch.randn(3)
+        y = 3.14
+        z = f(x, y)
+        self.assertEqual(z, x + y)
+
+        @f.impl("cpu")
+        def _(x, y):
+            return x - y
+
+        z = f(x, y)
+        self.assertEqual(z, x - y)
+
+        with self.assertRaises(RuntimeError):
+            with torch._subclasses.fake_tensor.FakeTensorMode():
+                x = torch.randn(3)
+                f(x, y)
+
+        @f.impl_abstract
+        def _(x, y):
+            return torch.empty_like(x)
+
+        with torch._subclasses.fake_tensor.FakeTensorMode():
+            x = torch.randn(3)
+            z = f(x, y)
+            self.assertEqual(z.shape, x.shape)
+
+    @skipIfTorchDynamo("recursive dynamo")
+    @unittest.skipIf(IS_WINDOWS, "torch.compile doesn't work on windows")
+    @unittest.skipIf(
+        sys.version_info >= (3, 12), "torch.compile is not supported on python 3.12+"
+    )
+    def test_blackbox_compile(self):
+        @torch.library.def_blackbox(mutated_args=())
+        def custom_linear(x: Tensor, weight: Tensor, bias: Tensor) -> Tensor:
+            return (x @ weight.t()) + bias
+
+        @custom_linear.impl_abstract
+        def _(x, weight, bias):
+            assert x.dim() == 2
+            assert weight.dim() == 2
+            assert bias.dim() == 1
+            assert x.shape[1] == weight.shape[1]
+            assert weight.shape[0] == bias.shape[0]
+            assert x.device == weight.device
+            return x.new_empty(x.size(0), weight.size(0))
+
+        x = torch.randn(2, 2)
+        weight = torch.randn(2, 2)
+        bias = torch.randn(2)
+        out = torch.compile(custom_linear, backend="eager", fullgraph=True)(
+            x, weight, bias
+        )
+        assert torch.allclose(out, torch.nn.functional.linear(x, weight, bias))
+
+    def test_blackbox_replaces(self):
+        @def_blackbox(mutated_args=())
+        def f(x: Tensor) -> Tensor:
+            return x.sin()
+
+        x = torch.randn(3)
+        y = f(x)
+        self.assertEqual(y, x.sin())
+
+        @def_blackbox(mutated_args=())
+        def f(x: Tensor) -> Tensor:
+            return x.cos()
+
+        y = f(x)
+        self.assertEqual(y, x.cos())
+
+    @unittest.skipIf(not TEST_CUDA, "requires CUDA")
+    def test_blackbox_split_device(self):
+        @def_blackbox(mutated_args=(), types="cpu")
+        def f(x: Tensor) -> Tensor:
+            return x.sin()
+
+        @f.impl("cuda")
+        def _(x: Tensor) -> Tensor:
+            return x.cos()
+
+        x = torch.randn(3)
+        y = f(x)
+        self.assertEqual(y, x.sin())
+        x = x.cuda()
+        y = f(x)
+        self.assertEqual(y, x.cos())
+
+    @unittest.skipIf(not TEST_CUDA, "requires CUDA")
+    def test_blackbox_multi_types(self):
+        @def_blackbox(mutated_args=(), types=("cpu", "cuda"))
+        def f(x: Tensor) -> Tensor:
+            return x.sin()
+
+        x = torch.randn(3)
+        y = f(x)
+        self.assertEqual(y, x.sin())
+        x = x.cuda()
+        y = f(x)
+        self.assertEqual(y, x.sin())
+
+    def test_blackbox_disallows_output_aliasing(self):
+        @def_blackbox(mutated_args=())
+        def f(x: Tensor) -> Tensor:
+            return x.view(-1)
+
+        x = torch.randn(3)
+        with self.assertRaisesRegex(RuntimeError, "may not alias"):
+            f(x)
+
+        @def_blackbox(mutated_args=())
+        def f(x: Tensor) -> Tensor:
+            return x
+
+        x = torch.randn(3)
+        with self.assertRaisesRegex(RuntimeError, "may not alias"):
+            f(x)
+
+    @skipIfTorchDynamo("dynamo module stack is different")
+    def test_blackbox_namespace_inference(self):
+        @def_blackbox(mutated_args=())
+        def f(x: Tensor) -> Tensor:
+            return x.view(-1)
+
+        self.assertExpectedInline(f._namespace, """mangled2__test_custom_ops""")
 
     def _generate_examples(self, typ):
         if typ is int:
