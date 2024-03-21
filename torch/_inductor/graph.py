@@ -20,7 +20,12 @@ from torch._logging import LazyString, trace_structured
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental._backward_state import BackwardState
 from torch.fx.experimental.sym_node import magic_methods, method_to_operator
-from torch.fx.experimental.symbolic_shapes import has_free_symbols, free_unbacked_symbols, ShapeEnv, SymTypes
+from torch.fx.experimental.symbolic_shapes import (
+    free_unbacked_symbols,
+    has_free_symbols,
+    ShapeEnv,
+    SymTypes,
+)
 from torch.utils._mode_utils import no_dispatch
 
 from . import config, ir

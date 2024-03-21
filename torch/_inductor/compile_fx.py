@@ -46,8 +46,8 @@ from torch._logging import trace_structured
 from torch._ops import OpOverload
 from torch._subclasses.fake_tensor import FakeTensor
 from torch._utils_internal import signpost_event
-from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 from torch.fx.experimental.symbolic_shapes import free_unbacked_symbols
+from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 
 from .._dynamo.backends.common import aot_autograd
 from ..fx._lazy_graph_module import _use_lazy_graph_module  # type: ignore[attr-defined]
@@ -711,7 +711,10 @@ def fx_codegen_and_compile(
                 # We'll put the output strides in the compiled graph so we
                 # can later return them to the caller via TracingContext
                 for out in graph.graph_outputs:
-                    if hasattr(out, "layout") and len(free_unbacked_symbols(out.layout.stride)) == 0:
+                    if (
+                        hasattr(out, "layout")
+                        and len(free_unbacked_symbols(out.layout.stride)) == 0
+                    ):
                         output_strides.append(
                             tuple(
                                 V.graph.sizevars.size_hint(s) for s in out.layout.stride
